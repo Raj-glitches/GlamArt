@@ -4,8 +4,8 @@
  */
 
 import jwt from 'jsonwebtoken';
+import asyncHandler from 'express-async-handler';
 import User from '../models/User.js';
-import asyncHandler from './errorMiddleware.js';
 
 // Protect routes - verify JWT token
 export const protect = asyncHandler(async (req, res, next) => {
@@ -77,3 +77,4 @@ export const generateToken = (id) => {
     expiresIn: process.env.JWT_EXPIRE || '30d'
   });
 };
+

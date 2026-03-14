@@ -4,10 +4,10 @@
  */
 
 import express from 'express';
+import asyncHandler from 'express-async-handler';
 import Category from '../models/Category.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
 import { uploadCategory } from '../middleware/uploadMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 

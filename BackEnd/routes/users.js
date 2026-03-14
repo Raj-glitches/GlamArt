@@ -4,9 +4,9 @@
  */
 
 import express from 'express';
+import asyncHandler from 'express-async-handler';
 import User from '../models/User.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 

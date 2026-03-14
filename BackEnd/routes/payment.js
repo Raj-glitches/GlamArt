@@ -4,11 +4,11 @@
  */
 
 import express from 'express';
+import asyncHandler from 'express-async-handler';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import Order from '../models/Order.js';
 import { protect } from '../middleware/authMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 

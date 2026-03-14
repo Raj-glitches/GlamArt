@@ -4,11 +4,10 @@
  */
 
 import express from 'express';
-import { body, query, validationResult } from 'express-validator';
+import asyncHandler from 'express-async-handler';
 import Product from '../models/Product.js';
 import { protect, adminOnly } from '../middleware/authMiddleware.js';
 import { uploadProductImages } from '../middleware/uploadMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 
@@ -145,7 +144,7 @@ router.get('/recommendations/:productId', asyncHandler(async (req, res) => {
   });
 }));
 
-// @route   GET /api/products/recently-viewed
+// @route   GET /api/products/user/recently-viewed
 // @desc    Get recently viewed products
 // @access  Private
 router.get('/user/recently-viewed', protect, asyncHandler(async (req, res) => {

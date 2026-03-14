@@ -4,11 +4,11 @@
  */
 
 import express from 'express';
+import asyncHandler from 'express-async-handler';
 import Review from '../models/Review.js';
 import Product from '../models/Product.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { uploadReview } from '../middleware/uploadMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 

@@ -6,7 +6,6 @@
 import multer from 'multer';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import { v2 as cloudinary } from 'cloudinary';
-import asyncHandler from './errorMiddleware.js';
 
 // Configure Cloudinary
 cloudinary.config({

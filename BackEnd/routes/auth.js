@@ -5,9 +5,9 @@
 
 import express from 'express';
 import { body, validationResult } from 'express-validator';
+import asyncHandler from 'express-async-handler';
 import User from '../models/User.js';
 import { generateToken, protect } from '../middleware/authMiddleware.js';
-import asyncHandler from '../middleware/errorMiddleware.js';
 
 const router = express.Router();
 
