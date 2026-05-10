@@ -138,6 +138,37 @@ const startServer = async () => {
   }
 };
 
+// DEBUG ENV
+console.log(
+  '✅ GEMINI KEY EXISTS:',
+  !!process.env.GEMINI_API_KEY
+);
+
+console.log(
+  '✅ MONGODB URI EXISTS:',
+  !!process.env.MONGODB_URI
+);
+
+console.log(
+  '✅ STRIPE SECRET EXISTS:',
+  !!process.env.STRIPE_SECRET_KEY
+);
+
+console.log(
+  '✅ STRIPE PUBLISHABLE EXISTS:',
+  !!process.env.STRIPE_PUBLISHABLE_KEY
+);
+
+console.log(
+  '✅ RAZORPAY KEY EXISTS:',
+  !!process.env.RAZORPAY_KEY_ID
+);
+
+console.log(
+  '✅ RAZORPAY SECRET EXISTS:',
+  !!process.env.RAZORPAY_KEY_SECRET
+);
+
 startServer();
 
 export default app;

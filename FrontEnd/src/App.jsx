@@ -110,7 +110,7 @@ function App() {
         } />
       </Routes>
 
-      <ToastContainer
+      {/* <ToastContainer
         position="top-right"
         autoClose={3000}
         hideProgressBar={false}
@@ -121,7 +121,7 @@ function App() {
         draggable
         pauseOnHover
         theme="light"
-      />
+      /> */}
       <Chatbot />
     </>
   );

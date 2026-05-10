@@ -1,355 +1,796 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import {
+  createSlice,
+  createAsyncThunk,
+} from '@reduxjs/toolkit';
+
 import axios from 'axios';
 
-const API_URL = 'http://localhost:5000/api/orders/';
+const API_URL =
+  'http://localhost:5000/api/orders/';
+
+const PAYMENT_URL =
+  'http://localhost:5000/api/payment';
+
+// ============================================
+// HELPERS
+// ============================================
+
+const getUserToken = () => {
+  try {
+    const storedUser =
+      localStorage.getItem('user');
+
+    if (!storedUser) return null;
+
+    const parsed =
+      JSON.parse(storedUser);
+
+    return parsed?.token || null;
+
+  } catch (error) {
+
+    console.error(
+      'TOKEN ERROR:',
+      error
+    );
+
+    return null;
+  }
+};
+
+const getAuthConfig = () => {
+  const token =
+    getUserToken();
+
+  return {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  };
+};
+
+const handleError = (
+  error,
+  thunkAPI
+) => {
+
+  const message =
+    error?.response?.data?.message ||
+    error?.message ||
+    'Something went wrong';
+
+  return thunkAPI.rejectWithValue(
+    message
+  );
+};
+
+// ============================================
+// INITIAL STATE
+// ============================================
 
 const initialState = {
   orders: [],
   currentOrder: null,
+
+  pagination: null,
+
+  stripeKey: null,
+  razorpayKey: null,
+
+  paymentIntent: null,
+
   isLoading: false,
-  error: null,
   success: false,
+  error: null,
 };
 
-// Get user orders
-export const getOrders = createAsyncThunk(
-  'orders/getOrders',
-  async (params = {}, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const queryString = new URLSearchParams(params).toString();
-      const response = await axios.get(API_URL + '?' + queryString, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      return response.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
-    }
-  }
-);
+// ============================================
+// GET ORDERS
+// ============================================
 
-// Get single order
-export const getOrder = createAsyncThunk(
-  'orders/getOrder',
-  async (orderId, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.get(API_URL + orderId, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
-    }
-  }
-);
+export const getOrders =
+  createAsyncThunk(
+    'orders/getOrders',
 
-// Create order
-export const createOrder = createAsyncThunk(
-  'orders/createOrder',
-  async (orderData, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(API_URL, orderData, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
-    }
-  }
-);
+    async (
+      params = {},
+      thunkAPI
+    ) => {
+      try {
 
-// Cancel order
-export const cancelOrder = createAsyncThunk(
-  'orders/cancelOrder',
-  async ({ orderId, reason }, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.put(API_URL + orderId + '/cancel', { reason }, {
-        headers: { Authorization: `Bearer ${user.token}` },
-      });
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
-    }
-  }
-);
+        const token =
+          getUserToken();
 
-// Create Stripe payment intent
-export const createStripePaymentIntent = createAsyncThunk(
-  'orders/createStripePaymentIntent',
-  async ({ amount, currency = 'inr' }, thunkAPI) => {
-    try {
-      const storedUser = localStorage.getItem('user');
-      let token = null;
-      
-      if (storedUser) {
-        try {
-          const parsed = JSON.parse(storedUser);
-          token = parsed?.token;
-        } catch (e) {
-          console.error('Error parsing user:', e);
+        if (!token) {
+          return thunkAPI.rejectWithValue(
+            'Please login first'
+          );
         }
+
+        const query =
+          new URLSearchParams(
+            params
+          ).toString();
+
+        const response =
+          await axios.get(
+            `${API_URL}?${query}`,
+            getAuthConfig()
+          );
+
+        return response.data;
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
       }
-      
-      if (!token) {
-        return thunkAPI.rejectWithValue('Not authenticated. Please login.');
+    }
+  );
+
+// ============================================
+// GET SINGLE ORDER
+// ============================================
+
+export const getOrder =
+  createAsyncThunk(
+    'orders/getOrder',
+
+    async (
+      orderId,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.get(
+            API_URL + orderId,
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
       }
-      
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/stripe/create-intent',
-        { amount, currency },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
     }
-  }
-);
+  );
 
-// Verify Stripe payment
-export const verifyStripePayment = createAsyncThunk(
-  'orders/verifyStripePayment',
-  async ({ paymentIntentId, orderId }, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/stripe/verify',
-        { paymentIntentId, orderId },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+// ============================================
+// CREATE ORDER
+// ============================================
+
+export const createOrder =
+  createAsyncThunk(
+    'orders/createOrder',
+
+    async (
+      orderData,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            API_URL,
+            orderData,
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-// Get Stripe publishable key
-export const getStripeKey = createAsyncThunk(
-  'orders/getStripeKey',
-  async (_, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.get(
-        'http://localhost:5000/api/payment/stripe/key',
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+// ============================================
+// CANCEL ORDER
+// ============================================
+
+export const cancelOrder =
+  createAsyncThunk(
+    'orders/cancelOrder',
+
+    async (
+      {
+        orderId,
+        reason,
+      },
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.put(
+            `${API_URL}${orderId}/cancel`,
+            { reason },
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-// Create Razorpay order
-export const createRazorpayOrder = createAsyncThunk(
-  'orders/createRazorpayOrder',
-  async ({ amount, currency = 'INR' }, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/razorpay/create',
-        { amount, currency },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+// ============================================
+// STRIPE
+// ============================================
+
+export const createStripePaymentIntent =
+  createAsyncThunk(
+    'orders/createStripePaymentIntent',
+
+    async (
+      {
+        amount,
+        currency = 'inr',
+      },
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            `${PAYMENT_URL}/stripe/create-intent`,
+            {
+              amount,
+              currency,
+            },
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-// Verify Razorpay payment
-export const verifyRazorpayPayment = createAsyncThunk(
-  'orders/verifyRazorpayPayment',
-  async ({ razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId }, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/razorpay/verify',
-        { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+export const verifyStripePayment =
+  createAsyncThunk(
+    'orders/verifyStripePayment',
+
+    async (
+      {
+        paymentIntentId,
+        orderId,
+      },
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            `${PAYMENT_URL}/stripe/verify`,
+            {
+              paymentIntentId,
+              orderId,
+            },
+            getAuthConfig()
+          );
+
+        return response.data;
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-// Get Razorpay key
-export const getRazorpayKey = createAsyncThunk(
-  'orders/getRazorpayKey',
-  async (_, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.get(
-        'http://localhost:5000/api/payment/razorpay/key',
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+export const getStripeKey =
+  createAsyncThunk(
+    'orders/getStripeKey',
+
+    async (
+      _,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.get(
+            `${PAYMENT_URL}/stripe/key`,
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-// COD order
-export const createCODOrder = createAsyncThunk(
-  'orders/createCODOrder',
-  async (orderId, thunkAPI) => {
-    try {
-      const user = JSON.parse(localStorage.getItem('user'));
-      const response = await axios.post(
-        'http://localhost:5000/api/payment/cod',
-        { orderId },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-      return response.data.data;
-    } catch (error) {
-      const message =
-        (error.response && error.response.data && error.response.data.message) ||
-        error.message ||
-        error.toString();
-      return thunkAPI.rejectWithValue(message);
+// ============================================
+// RAZORPAY
+// ============================================
+
+export const createRazorpayOrder =
+  createAsyncThunk(
+    'orders/createRazorpayOrder',
+
+    async (
+      {
+        amount,
+        currency = 'INR',
+      },
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            `${PAYMENT_URL}/razorpay/create`,
+            {
+              amount,
+              currency,
+            },
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
     }
-  }
-);
+  );
 
-const orderSlice = createSlice({
-  name: 'orders',
-  initialState: {
-    orders: [],
-    currentOrder: null,
-    isLoading: false,
-    error: null,
-    success: false,
-    stripeKey: null,
-    razorpayKey: null,
-    paymentIntent: null,
-  },
-  reducers: {
-    reset: (state) => {
-      state.isLoading = false;
-      state.error = null;
-      state.success = false;
+export const verifyRazorpayPayment =
+  createAsyncThunk(
+    'orders/verifyRazorpayPayment',
+
+    async (
+      paymentData,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            `${PAYMENT_URL}/razorpay/verify`,
+            paymentData,
+            getAuthConfig()
+          );
+
+        return response.data;
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
+    }
+  );
+
+export const getRazorpayKey =
+  createAsyncThunk(
+    'orders/getRazorpayKey',
+
+    async (
+      _,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.get(
+            `${PAYMENT_URL}/razorpay/key`,
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
+    }
+  );
+
+// ============================================
+// COD
+// ============================================
+
+export const createCODOrder =
+  createAsyncThunk(
+    'orders/createCODOrder',
+
+    async (
+      orderId,
+      thunkAPI
+    ) => {
+      try {
+
+        const response =
+          await axios.post(
+            `${PAYMENT_URL}/cod`,
+            { orderId },
+            getAuthConfig()
+          );
+
+        return (
+          response?.data?.data
+        );
+
+      } catch (error) {
+
+        return handleError(
+          error,
+          thunkAPI
+        );
+      }
+    }
+  );
+
+// ============================================
+// SLICE
+// ============================================
+
+const orderSlice =
+  createSlice({
+    name: 'orders',
+
+    initialState,
+
+    reducers: {
+
+      reset: (state) => {
+        state.isLoading = false;
+        state.error = null;
+        state.success = false;
+      },
+
+      clearCurrentOrder: (
+        state
+      ) => {
+        state.currentOrder =
+          null;
+      },
     },
-    clearCurrentOrder: (state) => {
-      state.currentOrder = null;
-    },
-  },
-  extraReducers: (builder) => {
-    builder
-      // Get orders
-      .addCase(getOrders.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(getOrders.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.orders = action.payload.data;
-        state.pagination = action.payload.pagination;
-      })
-      .addCase(getOrders.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      })
-      // Get single order
-      .addCase(getOrder.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(getOrder.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.currentOrder = action.payload;
-      })
-      .addCase(getOrder.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      })
-      // Create order
-      .addCase(createOrder.pending, (state) => {
-        state.isLoading = true;
-      })
-      .addCase(createOrder.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.currentOrder = action.payload;
-        state.success = true;
-      })
-      .addCase(createOrder.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      })
-      // Cancel order
-      .addCase(cancelOrder.fulfilled, (state, action) => {
-        const index = state.orders.findIndex(o => o._id === action.payload._id);
-        if (index !== -1) {
-          state.orders[index] = action.payload;
-        }
-        if (state.currentOrder?._id === action.payload._id) {
-          state.currentOrder = action.payload;
-        }
-      })
-      // Stripe payment intent
-      .addCase(createStripePaymentIntent.fulfilled, (state, action) => {
-        state.paymentIntent = action.payload;
-      })
-      // Stripe key
-      .addCase(getStripeKey.fulfilled, (state, action) => {
-        state.stripeKey = action.payload?.key;
-      })
-      // Razorpay key
-      .addCase(getRazorpayKey.fulfilled, (state, action) => {
-        state.razorpayKey = action.payload?.key;
-      })
-      // COD order
-      .addCase(createCODOrder.fulfilled, (state, action) => {
-        state.currentOrder = action.payload;
-        state.success = true;
-      });
-  },
-});
 
-export const { reset, clearCurrentOrder } = orderSlice.actions;
+    extraReducers: (
+      builder
+    ) => {
+
+      builder
+
+        // ============================================
+        // GET ORDERS
+        // ============================================
+
+        .addCase(
+          getOrders.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.orders =
+              action?.payload?.data || [];
+
+            state.pagination =
+              action?.payload?.pagination || null;
+          }
+        )
+
+        // ============================================
+        // GET ORDER
+        // ============================================
+
+        .addCase(
+          getOrder.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.currentOrder =
+              action.payload;
+          }
+        )
+
+        // ============================================
+        // CREATE ORDER
+        // ============================================
+
+        .addCase(
+          createOrder.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.success =
+              true;
+
+            state.currentOrder =
+              action.payload;
+
+            state.orders.unshift(
+              action.payload
+            );
+          }
+        )
+
+        // ============================================
+        // CANCEL ORDER
+        // ============================================
+
+        .addCase(
+          cancelOrder.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            const updatedOrder =
+              action.payload;
+
+            const index =
+              state.orders.findIndex(
+                (order) =>
+                  order._id ===
+                  updatedOrder._id
+              );
+
+            if (index !== -1) {
+
+              state.orders[index] =
+                updatedOrder;
+            }
+
+            if (
+              state.currentOrder?._id ===
+              updatedOrder._id
+            ) {
+
+              state.currentOrder =
+                updatedOrder;
+            }
+          }
+        )
+
+        // ============================================
+        // STRIPE
+        // ============================================
+
+        .addCase(
+          createStripePaymentIntent.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.paymentIntent =
+              action.payload;
+          }
+        )
+
+        .addCase(
+          getStripeKey.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.stripeKey =
+              action.payload?.key || null;
+          }
+        )
+
+        // ============================================
+        // RAZORPAY
+        // ============================================
+
+        .addCase(
+          getRazorpayKey.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.razorpayKey =
+              action.payload?.key || null;
+          }
+        )
+
+        // ============================================
+        // COD
+        // ============================================
+
+        .addCase(
+          createCODOrder.fulfilled,
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.success =
+              true;
+
+            state.currentOrder =
+              action.payload;
+          }
+        )
+
+        // ============================================
+        // VERIFY STRIPE
+        // ============================================
+
+        .addCase(
+          verifyStripePayment.fulfilled,
+
+          (state) => {
+
+            state.isLoading =
+              false;
+
+            state.success =
+              true;
+          }
+        )
+
+        // ============================================
+        // VERIFY RAZORPAY
+        // ============================================
+
+        .addCase(
+          verifyRazorpayPayment.fulfilled,
+
+          (state) => {
+
+            state.isLoading =
+              false;
+
+            state.success =
+              true;
+          }
+        )
+
+        // ============================================
+        // COMMON PENDING
+        // ============================================
+
+        .addMatcher(
+
+          (action) =>
+            action.type.startsWith(
+              'orders/'
+            ) &&
+            action.type.endsWith(
+              '/pending'
+            ),
+
+          (state) => {
+
+            state.isLoading =
+              true;
+
+            state.error =
+              null;
+          }
+        )
+
+        // ============================================
+        // COMMON REJECTED
+        // ============================================
+
+        .addMatcher(
+
+          (action) =>
+            action.type.startsWith(
+              'orders/'
+            ) &&
+            action.type.endsWith(
+              '/rejected'
+            ),
+
+          (
+            state,
+            action
+          ) => {
+
+            state.isLoading =
+              false;
+
+            state.error =
+              action.payload;
+          }
+        );
+    },
+  });
+
+export const {
+  reset,
+  clearCurrentOrder,
+} = orderSlice.actions;
+
 export default orderSlice.reducer;

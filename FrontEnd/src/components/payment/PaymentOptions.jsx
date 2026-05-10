@@ -1,187 +1,296 @@
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { motion } from 'framer-motion';
 
-const PaymentOptions = ({ 
-  onPaymentMethodChange, 
-  selectedMethod, 
+const PaymentOptions = ({
+  onPaymentMethodChange,
+  selectedMethod,
   isLoading,
-  onProceed 
+  onProceed,
 }) => {
-  const [showCardForm, setShowCardForm] = useState(false);
 
   const paymentMethods = [
     {
       id: 'razorpay',
       name: 'Razorpay',
       icon: '💳',
-      description: 'Secure card payments',
-      processingFee: 0
+      description:
+        'Cards, UPI, Net Banking & Wallets',
+      badge: 'Recommended',
     },
     {
       id: 'stripe',
       name: 'Stripe',
-      icon: '💳',
-      description: 'International cards accepted',
-      processingFee: 0
+      icon: '💎',
+      description:
+        'Visa, Mastercard, International Payments',
+      badge: 'International',
     },
     {
       id: 'cod',
       name: 'Cash on Delivery',
       icon: '💰',
-      description: 'Pay when delivered',
-      processingFee: 0
+      description:
+        'Pay after product delivery',
+      badge: null,
     },
-    {
-      id: 'upi',
-      name: 'UPI (PhonePe, GPay)',
-      icon: '📱',
-      description: 'Instant UPI payments',
-      processingFee: 0
-    },
-    {
-      id: 'wallet',
-      name: 'Wallets (Paytm, AmazonPay)',
-      icon: '💼',
-      description: 'Paytm, PhonePe, AmazonPay',
-      processingFee: 0
-    }
   ];
+
+  const renderPaymentInfo = () => {
+
+    switch (selectedMethod) {
+
+      case 'razorpay':
+        return (
+          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50 p-5">
+            <h4 className="mb-2 text-lg font-semibold text-gray-800">
+              💳 Razorpay Payment
+            </h4>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Supports:
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                'UPI',
+                'Visa',
+                'Mastercard',
+                'RuPay',
+                'Net Banking',
+                'Wallets',
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full bg-white px-3 py-1 text-xs font-medium shadow-sm"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 text-green-600 text-sm">
+              <span>🔒</span>
+              <span>
+                Secure checkout powered by Razorpay
+              </span>
+            </div>
+          </div>
+        );
+
+      case 'stripe':
+        return (
+          <div className="mt-6 rounded-xl border border-purple-100 bg-purple-50 p-5">
+            <h4 className="mb-2 text-lg font-semibold text-gray-800">
+              💎 Stripe Payment
+            </h4>
+
+            <p className="text-sm text-gray-600 mb-4">
+              Supports international and domestic cards securely.
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {[
+                'Visa',
+                'Mastercard',
+                'American Express',
+                'Apple Pay',
+                'Google Pay',
+              ].map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full bg-white px-3 py-1 text-xs font-medium shadow-sm"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center gap-2 text-green-600 text-sm">
+              <span>🔒</span>
+              <span>
+                Secure checkout powered by Stripe
+              </span>
+            </div>
+          </div>
+        );
+
+      case 'cod':
+        return (
+          <div className="mt-6 rounded-xl border border-yellow-100 bg-yellow-50 p-5">
+            <h4 className="mb-2 text-lg font-semibold text-gray-800">
+              💰 Cash on Delivery
+            </h4>
+
+            <p className="text-sm text-gray-700">
+              Pay using cash when your order arrives
+              at your doorstep.
+            </p>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl shadow-xl border border-gray-100 p-8 mb-8"
+      initial={{
+        opacity: 0,
+        y: 20,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      className="bg-white rounded-2xl shadow-card p-6"
     >
-      <h3 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-        💳 Secure Payment
-        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs rounded-full font-medium">
-          100% Safe
-        </span>
-      </h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {paymentMethods.map((method) => (
-          <motion.button
-            key={method.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onPaymentMethodChange(method.id)}
-            className={`group relative p-6 rounded-xl border-2 transition-all duration-300 hover:shadow-2xl ${
-              selectedMethod === method.id
-                ? 'border-primary-500 bg-primary-50 shadow-lg ring-2 ring-primary-200 ring-opacity-50'
-                : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50'
-            }`}
-            disabled={isLoading}
-          >
-            <div className="flex items-start gap-4">
-              <div className="text-2xl p-2 bg-gradient-to-br from-primary-100 to-purple-100 rounded-xl group-hover:scale-110 transition-transform">
-                {method.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-bold text-lg text-gray-900 mb-1 group-hover:text-primary-600">
-                  {method.name}
-                </h4>
-                <p className="text-sm text-gray-600">{method.description}</p>
-              </div>
-              {selectedMethod === method.id && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-primary-500 text-white rounded-full flex items-center justify-center text-xs font-bold shadow-lg"
-                >
-                  ✓
-                </motion.div>
-              )}
-            </div>
-          </motion.button>
-        ))}
+      {/* Header */}
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">
+          💳 Secure Payment
+        </h2>
+
+        <p className="text-gray-500 mt-1">
+          Choose your preferred payment method
+        </p>
       </div>
 
-      <AnimatePresence mode="wait">
-        {selectedMethod === 'razorpay' && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="border-t pt-6"
-          >
-            <h4 className="font-bold text-gray-900 mb-4">Razorpay</h4>
-            <div className="grid md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="label">Card Number</label>
-                <input
-                  type="text"
-                  placeholder="1234 5678 9012 3456"
-                  className="input"
-                  disabled
-                />
-              </div>
-              <div>
-                <label className="label">Expiry</label>
-                <input
-                  type="text"
-                  placeholder="MM/YY"
-                  className="input"
-                  disabled
-                />
-              </div>
-              <div className="md:col-span-2">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">CVV</label>
-                    <input
-                      type="text"
-                      placeholder="123"
-                      className="input"
-                      disabled
-                    />
+      {/* Security Banner */}
+      <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
+        <div className="flex items-center gap-2 text-green-700">
+          <span className="text-lg">🔒</span>
+
+          <div>
+            <p className="font-semibold">
+              100% Secure Checkout
+            </p>
+
+            <p className="text-sm text-green-600">
+              Your payment information is encrypted and protected
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Payment Methods */}
+      <div className="space-y-4">
+
+        {paymentMethods.map((method) => {
+
+          const isSelected =
+            selectedMethod === method.id;
+
+          return (
+            <motion.button
+              key={method.id}
+
+              whileHover={{
+                scale: 1.01,
+              }}
+
+              whileTap={{
+                scale: 0.99,
+              }}
+
+              type="button"
+
+              disabled={isLoading}
+
+              onClick={() =>
+                onPaymentMethodChange(
+                  method.id
+                )
+              }
+
+              className={`w-full rounded-2xl border-2 p-5 text-left transition-all ${
+                isSelected
+                  ? 'border-primary-500 bg-primary-50 shadow-lg'
+                  : 'border-gray-200 hover:border-primary-300 hover:bg-gray-50'
+              }`}
+            >
+
+              <div className="flex items-start justify-between">
+
+                <div className="flex gap-4">
+
+                  <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-white text-2xl shadow-sm">
+                    {method.icon}
                   </div>
+
                   <div>
-                    <label className="label">Name on Card</label>
-                    <input
-                      type="text"
-                      placeholder="John Doe"
-                      className="input"
-                      disabled
-                    />
+
+                    <div className="flex items-center gap-2">
+
+                      <h3 className="text-lg font-bold text-gray-900">
+                        {method.name}
+                      </h3>
+
+                      {method.badge && (
+                        <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-medium text-primary-700">
+                          {method.badge}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="mt-1 text-sm text-gray-600">
+                      {method.description}
+                    </p>
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-green-600 mb-6">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              <span>Secure payment powered by Razorpay. Your data is encrypted.</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+                {isSelected && (
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-sm text-white">
+                    ✓
+                  </div>
+                )}
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Selected Payment Info */}
+      {renderPaymentInfo()}
+
+      {/* Proceed Button */}
+      <button
+        type="button"
+
         disabled={isLoading}
+
         onClick={onProceed}
-        className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-4 px-6 rounded-xl shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+
+        className="btn-primary mt-8 w-full py-4 text-lg font-semibold"
       >
+
         {isLoading ? (
-          <div className="flex items-center gap-2 justify-center">
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>Processing Payment...</span>
+          <div className="flex items-center justify-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+
+            <span>
+              Processing...
+            </span>
           </div>
         ) : (
-          'Complete Secure Payment'
+          <>
+            {selectedMethod === 'cod'
+              ? 'Place Order'
+              : `Pay Securely with ${
+                  selectedMethod === 'stripe'
+                    ? 'Stripe'
+                    : 'Razorpay'
+                }`}
+          </>
         )}
-      </motion.button>
+      </button>
 
-      <div className="mt-6 pt-6 border-t text-xs text-gray-500 text-center">
-        <p>Protected by SSL encryption • Secure payment gateway • 24/7 support</p>
+      {/* Footer */}
+      <div className="mt-5 text-center text-xs text-gray-500">
+        SSL Secured Checkout • Encrypted Payments • Trusted Payment Gateway
       </div>
     </motion.div>
   );
 };
 
 export default PaymentOptions;
-

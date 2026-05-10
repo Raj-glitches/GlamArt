@@ -1,6 +1,6 @@
 /**
  * Payment Routes
- * Supports both Stripe and Razorpay payment gateways
+ * Supports Razorpay, Stripe and COD
  */
 
 import express from 'express';
@@ -8,265 +8,757 @@ import asyncHandler from 'express-async-handler';
 import Stripe from 'stripe';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+
 import Order from '../models/Order.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Initialize payment gateways
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_your_key');
+console.log(
+  '✅ PAYMENT ROUTES LOADED'
+);
 
-const razorpayInstance = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'your_razorpay_key_id',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'your_razorpay_key_secret'
-});
+/* ============================================
+   ENV VARIABLES
+============================================ */
 
-// ============================================
-// RAZORPAY INTEGRATION
-// ============================================
+const STRIPE_SECRET_KEY =
+  process.env.STRIPE_SECRET_KEY;
 
-// @route   POST /api/payment/razorpay/create
-// @desc    Create Razorpay order
-// @access  Private
-router.post('/razorpay/create', protect, asyncHandler(async (req, res) => {
-  const { amount, currency = 'INR' } = req.body;
+const STRIPE_PUBLISHABLE_KEY =
+  process.env.STRIPE_PUBLISHABLE_KEY;
 
-  const razorpayOrder = await razorpayInstance.orders.create({
-    amount: Math.round(amount * 100),
-    currency,
-    receipt: `glamart_${Date.now()}`,
-    notes: {
-      userId: req.user._id.toString()
-    }
-  });
+const RAZORPAY_KEY_ID =
+  process.env.RAZORPAY_KEY_ID;
 
-  res.json({
-    success: true,
-    data: {
-      orderId: razorpayOrder.id,
-      amount: razorpayOrder.amount,
-      currency: razorpayOrder.currency
-    }
-  });
-}));
+const RAZORPAY_KEY_SECRET =
+  process.env.RAZORPAY_KEY_SECRET;
 
-// @route   POST /api/payment/razorpay/verify
-// @desc    Verify Razorpay payment
-// @access  Private
-router.post('/razorpay/verify', protect, asyncHandler(async (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId } = req.body;
+/* ============================================
+   INITIALIZE STRIPE
+============================================ */
 
-  const generatedSignature = crypto
-    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'your_razorpay_key_secret')
-    .update(razorpay_order_id + '|' + razorpay_payment_id)
-    .digest('hex');
+let stripe = null;
 
-  if (generatedSignature !== razorpay_signature) {
-    return res.status(400).json({
-      success: false,
-      message: 'Invalid payment signature'
+if (STRIPE_SECRET_KEY) {
+
+  stripe = new Stripe(
+    STRIPE_SECRET_KEY
+  );
+
+  console.log(
+    '✅ Stripe initialized'
+  );
+
+} else {
+
+  console.log(
+    '⚠️ STRIPE_SECRET_KEY missing'
+  );
+}
+
+/* ============================================
+   INITIALIZE RAZORPAY
+============================================ */
+
+let razorpayInstance =
+  null;
+
+if (
+  RAZORPAY_KEY_ID &&
+  RAZORPAY_KEY_SECRET
+) {
+
+  razorpayInstance =
+    new Razorpay({
+
+      key_id:
+        RAZORPAY_KEY_ID,
+
+      key_secret:
+        RAZORPAY_KEY_SECRET,
     });
-  }
 
-  const order = await Order.findById(orderId);
-  if (order) {
-    order.paymentStatus = 'paid';
-    order.paymentId = razorpay_payment_id;
-    order.orderStatus = 'confirmed';
-    order.paymentMethod = 'razorpay';
-    order.paymentGateway = 'razorpay';
-    await order.save();
-  }
+  console.log(
+    '✅ Razorpay initialized'
+  );
 
-  res.json({
-    success: true,
-    message: 'Payment verified successfully',
-    data: { orderId }
-  });
-}));
+} else {
 
-// @route   GET /api/payment/razorpay/key
-// @desc    Get Razorpay key
-// @access  Private
-router.get('/razorpay/key', protect, asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      key: process.env.RAZORPAY_KEY_ID || 'your_razorpay_key_id'
+  console.log(
+    '⚠️ Razorpay keys missing'
+  );
+}
+
+/* ============================================
+   GET RAZORPAY KEY
+============================================ */
+
+router.get(
+  '/razorpay/key',
+  protect,
+  asyncHandler(
+    async (req, res) => {
+
+      if (
+        !RAZORPAY_KEY_ID
+      ) {
+
+        return res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              'Razorpay key missing',
+          });
+      }
+
+      res.json({
+
+        success: true,
+
+        data: {
+          key:
+            RAZORPAY_KEY_ID,
+        },
+      });
     }
-  });
-}));
+  )
+);
 
-// ============================================
-// STRIPE INTEGRATION
-// ============================================
+/* ============================================
+   CREATE RAZORPAY ORDER
+============================================ */
 
-// @route   POST /api/payment/stripe/create-intent
-// @desc    Create Stripe payment intent
-// @access  Private
-router.post('/stripe/create-intent', protect, asyncHandler(async (req, res) => {
-  const { amount, currency = 'inr' } = req.body;
+router.post(
+  '/razorpay/create',
+  protect,
+  asyncHandler(
+    async (req, res) => {
 
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(amount * 100),
-    currency,
-    metadata: {
-      userId: req.user._id.toString()
+      if (
+        !razorpayInstance
+      ) {
+
+        return res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              'Razorpay not configured',
+          });
+      }
+
+      const {
+        amount,
+        currency = 'INR',
+      } = req.body;
+
+      if (!amount) {
+
+        return res
+          .status(400)
+          .json({
+
+            success: false,
+
+            message:
+              'Amount is required',
+          });
+      }
+
+      const options = {
+
+        amount:
+          Math.round(
+            Number(amount) * 100
+          ),
+
+        currency,
+
+        receipt:
+          `glamart_${Date.now()}`,
+
+        notes: {
+
+          userId:
+            req.user._id.toString(),
+        },
+      };
+
+      const razorpayOrder =
+        await razorpayInstance.orders.create(
+          options
+        );
+
+      res.json({
+
+        success: true,
+
+        data: {
+
+          orderId:
+            razorpayOrder.id,
+
+          amount:
+            razorpayOrder.amount,
+
+          currency:
+            razorpayOrder.currency,
+        },
+      });
     }
-  });
+  )
+);
 
-  res.json({
-    success: true,
-    data: {
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id
+/* ============================================
+   VERIFY RAZORPAY PAYMENT
+============================================ */
+
+router.post(
+  '/razorpay/verify',
+  protect,
+  asyncHandler(
+    async (req, res) => {
+
+      if (
+        !RAZORPAY_KEY_SECRET
+      ) {
+
+        return res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              'Razorpay secret missing',
+          });
+      }
+
+      const {
+
+        razorpay_order_id,
+
+        razorpay_payment_id,
+
+        razorpay_signature,
+
+        orderId,
+
+      } = req.body;
+
+      const generatedSignature =
+        crypto
+          .createHmac(
+            'sha256',
+            RAZORPAY_KEY_SECRET
+          )
+          .update(
+            `${razorpay_order_id}|${razorpay_payment_id}`
+          )
+          .digest(
+            'hex'
+          );
+
+      if (
+        generatedSignature !==
+        razorpay_signature
+      ) {
+
+        return res
+          .status(400)
+          .json({
+
+            success: false,
+
+            message:
+              'Invalid payment signature',
+          });
+      }
+
+      const order =
+        await Order.findById(
+          orderId
+        );
+
+      if (!order) {
+
+        return res
+          .status(404)
+          .json({
+
+            success: false,
+
+            message:
+              'Order not found',
+          });
+      }
+
+      order.paymentStatus =
+        'paid';
+
+      order.paymentId =
+        razorpay_payment_id;
+
+      order.razorpayOrderId =
+        razorpay_order_id;
+
+      order.paymentMethod =
+        'razorpay';
+
+      order.paymentGateway =
+        'razorpay';
+
+      order.orderStatus =
+        'confirmed';
+
+      await order.save();
+
+      res.json({
+
+        success: true,
+
+        message:
+          'Payment verified successfully',
+
+        data:
+          order,
+      });
     }
-  });
-}));
+  )
+);
 
-// @route   POST /api/payment/stripe/verify
-// @desc    Verify Stripe payment
-// @access  Private
-router.post('/stripe/verify', protect, asyncHandler(async (req, res) => {
-  const { paymentIntentId, orderId } = req.body;
+/* ============================================
+   GET STRIPE KEY
+============================================ */
 
-  const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+router.get(
+  '/stripe/key',
+  protect,
+  asyncHandler(
+    async (req, res) => {
 
-  if (!paymentIntent) {
-    return res.status(404).json({ success: false, message: 'Payment not found' });
-  }
+      if (
+        !STRIPE_PUBLISHABLE_KEY
+      ) {
 
-  const order = await Order.findById(orderId);
-  if (order && paymentIntent.status === 'succeeded') {
-    order.paymentStatus = 'paid';
-    order.paymentId = paymentIntentId;
-    order.orderStatus = 'confirmed';
-    order.paymentMethod = 'stripe';
-    order.paymentGateway = 'stripe';
-    await order.save();
-  }
+        return res
+          .status(500)
+          .json({
 
-  res.json({
-    success: true,
-    message: 'Payment verified successfully',
-    data: { orderId }
-  });
-}));
+            success: false,
 
-// @route   GET /api/payment/stripe/key
-// @desc    Get Stripe publishable key
-// @access  Private
-router.get('/stripe/key', protect, asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    data: {
-      key: process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_your_key'
+            message:
+              'Stripe publishable key missing',
+          });
+      }
+
+      res.json({
+
+        success: true,
+
+        data: {
+
+          key:
+            STRIPE_PUBLISHABLE_KEY,
+        },
+      });
     }
-  });
-}));
+  )
+);
 
-// ============================================
-// CASH ON DELIVERY
-// ============================================
+/* ============================================
+   CREATE STRIPE PAYMENT INTENT
+============================================ */
 
-// @route   POST /api/payment/cod
-// @desc    Create COD order
-// @access  Private
-router.post('/cod', protect, asyncHandler(async (req, res) => {
-  const { orderId } = req.body;
+router.post(
+  '/stripe/create-intent',
+  protect,
+  asyncHandler(
+    async (req, res) => {
 
-  const order = await Order.findOne({ _id: orderId, user: req.user._id });
+      try {
 
-  if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
-  }
+        if (!stripe) {
 
-  order.paymentStatus = 'pending';
-  order.paymentMethod = 'cod';
-  order.paymentGateway = 'cod';
-  order.orderStatus = 'confirmed';
-  await order.save();
+          return res
+            .status(500)
+            .json({
 
-  res.json({
-    success: true,
-    data: order,
-    message: 'COD order placed successfully'
-  });
-}));
+              success: false,
 
-// ============================================
-// WEBHOOKS
-// ============================================
-
-// @route   POST /api/payment/webhook/stripe
-// @desc    Handle Stripe webhook
-// @access  Public
-router.post('/webhook/stripe', express.raw({ type: 'application/json' }), asyncHandler(async (req, res) => {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  let event;
-
-  if (webhookSecret) {
-    const signature = req.headers['stripe-signature'];
-    try {
-      event = stripe.webhooks.constructEvent(req.body, signature, webhookSecret);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).json({ error: 'Webhook signature verification failed' });
-    }
-  } else {
-    event = JSON.parse(req.body);
-  }
-
-  switch (event.type) {
-    case 'payment_intent.succeeded':
-      const paymentIntent = event.data.object;
-      await Order.findOneAndUpdate(
-        { paymentIntentId: paymentIntent.id },
-        { 
-          paymentStatus: 'paid',
-          orderStatus: 'confirmed'
+              message:
+                'Stripe not initialized',
+            });
         }
-      );
-      break;
-    case 'payment_intent.payment_failed':
-      const failedIntent = event.data.object;
-      await Order.findOneAndUpdate(
-        { paymentIntentId: failedIntent.id },
-        { paymentStatus: 'failed' }
-      );
-      break;
-  }
 
-  res.json({ received: true });
-}));
+        const {
+          amount,
+          currency = 'inr',
+        } = req.body;
 
-// ============================================
-// PAYMENT STATUS
-// ============================================
+        if (
+          !amount ||
+          isNaN(amount)
+        ) {
 
-// @route   GET /api/payment/status/:orderId
-// @desc    Get payment status
-// @access  Private
-router.get('/status/:orderId', protect, asyncHandler(async (req, res) => {
-  const order = await Order.findOne({ 
-    _id: req.params.orderId, 
-    user: req.user._id 
-  });
+          return res
+            .status(400)
+            .json({
 
-  if (!order) {
-    return res.status(404).json({ success: false, message: 'Order not found' });
-  }
+              success: false,
 
-  res.json({
-    success: true,
-    data: {
-      paymentStatus: order.paymentStatus,
-      paymentMethod: order.paymentMethod,
-      paymentGateway: order.paymentGateway,
-      paymentId: order.paymentId,
-      orderStatus: order.orderStatus
+              message:
+                'Invalid amount',
+            });
+        }
+
+        const paymentIntent =
+          await stripe.paymentIntents.create({
+
+            amount:
+              Math.round(
+                Number(amount) * 100
+              ),
+
+            currency,
+
+            payment_method_types: [
+              'card',
+            ],
+
+            metadata: {
+
+              userId:
+                req.user._id.toString(),
+            },
+          });
+
+        res.json({
+
+          success: true,
+
+          data: {
+
+            clientSecret:
+              paymentIntent.client_secret,
+
+            paymentIntentId:
+              paymentIntent.id,
+          },
+        });
+
+      } catch (error) {
+
+        console.error(
+          'STRIPE PAYMENT INTENT ERROR:',
+          error
+        );
+
+        res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              error.message ||
+              'Stripe payment failed',
+          });
+      }
     }
-  });
-}));
+  )
+);
+
+/* ============================================
+   VERIFY STRIPE PAYMENT
+============================================ */
+
+router.post(
+  '/stripe/verify',
+  protect,
+  asyncHandler(
+    async (req, res) => {
+
+      try {
+
+        if (!stripe) {
+
+          return res
+            .status(500)
+            .json({
+
+              success: false,
+
+              message:
+                'Stripe not initialized',
+            });
+        }
+
+        const {
+
+          paymentIntentId,
+
+          orderId,
+
+        } = req.body;
+
+        if (
+          !paymentIntentId
+        ) {
+
+          return res
+            .status(400)
+            .json({
+
+              success: false,
+
+              message:
+                'Payment Intent ID missing',
+            });
+        }
+
+        const paymentIntent =
+          await stripe.paymentIntents.retrieve(
+            paymentIntentId
+          );
+
+        if (
+          paymentIntent.status !==
+          'succeeded'
+        ) {
+
+          return res
+            .status(400)
+            .json({
+
+              success: false,
+
+              message:
+                'Payment not successful',
+            });
+        }
+
+        const order =
+          await Order.findById(
+            orderId
+          );
+
+        if (!order) {
+
+          return res
+            .status(404)
+            .json({
+
+              success: false,
+
+              message:
+                'Order not found',
+            });
+        }
+
+        order.paymentStatus =
+          'paid';
+
+        order.paymentMethod =
+          'stripe';
+
+        order.paymentGateway =
+          'stripe';
+
+        order.paymentId =
+          paymentIntent.id;
+
+        order.orderStatus =
+          'confirmed';
+
+        await order.save();
+
+        res.json({
+
+          success: true,
+
+          message:
+            'Stripe payment verified',
+
+          data:
+            order,
+        });
+
+      } catch (error) {
+
+        console.error(
+          'STRIPE VERIFY ERROR:',
+          error
+        );
+
+        res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              error.message ||
+              'Stripe verification failed',
+          });
+      }
+    }
+  )
+);
+
+/* ============================================
+   PAYMENT STATUS
+============================================ */
+
+router.get(
+  '/status/:orderId',
+  protect,
+  asyncHandler(
+    async (req, res) => {
+
+      const order =
+        await Order.findOne({
+
+          _id:
+            req.params.orderId,
+
+          user:
+            req.user._id,
+        });
+
+      if (!order) {
+
+        return res
+          .status(404)
+          .json({
+
+            success: false,
+
+            message:
+              'Order not found',
+          });
+      }
+
+      res.json({
+
+        success: true,
+
+        data: {
+
+          paymentStatus:
+            order.paymentStatus,
+
+          paymentMethod:
+            order.paymentMethod,
+
+          paymentGateway:
+            order.paymentGateway,
+
+          paymentId:
+            order.paymentId,
+
+          orderStatus:
+            order.orderStatus,
+        },
+      });
+    }
+  )
+);
+
+router.post(
+  '/cod',
+  protect,
+  asyncHandler(
+    async (req, res) => {
+
+      try {
+
+        const {
+          orderId,
+        } = req.body;
+
+        if (!orderId) {
+
+          return res
+            .status(400)
+            .json({
+
+              success: false,
+
+              message:
+                'Order ID required',
+            });
+        }
+
+        const order =
+          await Order.findById(
+            orderId
+          );
+
+        if (!order) {
+
+          return res
+            .status(404)
+            .json({
+
+              success: false,
+
+              message:
+                'Order not found',
+            });
+        }
+
+        order.paymentMethod =
+          'cod';
+
+        order.paymentGateway =
+          'cod';
+
+        order.paymentStatus =
+          'pending';
+
+        order.orderStatus =
+          'confirmed';
+
+        await order.save();
+
+        res.json({
+
+          success: true,
+
+          message:
+            'COD order placed successfully',
+
+          data:
+            order,
+        });
+
+      } catch (error) {
+
+        console.error(
+          'COD ERROR:',
+          error
+        );
+
+        res
+          .status(500)
+          .json({
+
+            success: false,
+
+            message:
+              error.message ||
+              'COD failed',
+          });
+      }
+    }
+  )
+);
 
 export default router;
