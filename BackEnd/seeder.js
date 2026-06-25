@@ -345,6 +345,8 @@ const seedDatabase =
          CREATE CATEGORIES
       ============================================ */
 
+   
+
       const createdCategories =
         await Category.insertMany(
           categories
@@ -373,22 +375,38 @@ const seedDatabase =
       /* ============================================
          FINAL PRODUCTS
       ============================================ */
+   const finalProducts = products.map((product) => {
+  const mappedCategory = categoryMap[product.category];
 
-      const finalProducts =
-        products.map(
-          (product) => ({
+  if (!mappedCategory) {
+    console.log(
+      '❌ Category not found:',
+      product.title,
+      product.category
+    );
+  }
 
-            ...product,
+  return {
+    ...product,
+    category: mappedCategory,
+    createdBy: admin._id,
+  };
+});
+      // const finalProducts =
+      //   products.map(
+      //     (product) => ({
 
-            category:
-              categoryMap[
-                product.categoryKey
-              ],
+      //       ...product,
 
-            createdBy:
-              admin._id,
-          })
-        );
+      //       category:
+      //         categoryMap[
+      //           product.category
+      //         ],
+
+      //       createdBy:
+      //         admin._id,
+      //     })
+      //   );
 
       /* ============================================
          INSERT PRODUCTS
